@@ -1,6 +1,9 @@
 Option Explicit
  
- 
+'Código criado por Taiguara Nascimento (taiguara.nascimento@gmail.com) 
+'O objetivo dessa macro do Outlook é entrar em cada um de todos os e-mails enviados e recebidos
+'e listar todos os endereços de e-mail listados em cada um. A finalidade é retomar contatos
+'realizados há algum tempo ou ainda para profissionais que trabalham com e-mail marketing/comercial.
 'No outlook, clique em Arquivo > Opções > Personalizar Faixa de Opções > Desenvolvedor.
 'Após ativar, vá até a guia Desenvolvedor > Visual Basic
 'Com a tela do Visual Basic aberta, clique em Inserir > Módulo
@@ -207,3 +210,5 @@ Private Function Corrigir_Remetente(ByVal remetente As String)
         Corrigir_Remetente = remetente
 
 End Function
+
+'Fim do Código para Copiar ---------------------------------------------------
