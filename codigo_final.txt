@@ -1,0 +1,209 @@
+Option Explicit
+ 
+ 
+'No outlook, clique em Arquivo > Opções > Personalizar Faixa de Opções > Desenvolvedor.
+'Após ativar, vá até a guia Desenvolvedor > Visual Basic
+'Com a tela do Visual Basic aberta, clique em Inserir > Módulo
+'Uma caixa vazia irá se abrir, copie e cole o código abaixo
+'Após isso, feche a janela do Visual Basic.
+'Selecione e caixa de entrada do Outlook, pressione Alt + F8
+'Selecione a macro Obter_Lista_de_Emails e depois em Executar
+'É só esperar: a macro salva tudo na pasta Documentos do usuário ativo
+'Pronto!
+ 
+'Início do Código para Copiar ---------------------------------------------------
+
+
+Public Sub Processar_Leitura()
+
+    Dim objNameSpace As Outlook.NameSpace
+    Dim objMainFolder As Outlook.Folder
+    
+    Set objNameSpace = Application.GetNamespace("MAPI")
+    Set objMainFolder = objNameSpace.GetDefaultFolder(olFolderInbox)
+    
+    Call ProcessCurrentFolder(objMainFolder)
+    
+    MsgBox "Concluído"
+    
+End Sub
+ 
+ 
+ 
+ 
+ Private Sub ProcessCurrentFolder(ByVal objParentFolder As Outlook.MAPIFolder)
+ 
+    Dim objCurFolder As Outlook.MAPIFolder
+    Dim objMail As Outlook.MailItem
+    
+    On Error Resume Next
+    
+    Listar_Emails_do_Outlook objParentFolder
+    
+    If (objParentFolder.Folders.Count > 0) Then
+        For Each objCurFolder In objParentFolder.Folders
+            Call ProcessCurrentFolder(objCurFolder)
+        Next
+    End If
+    
+End Sub
+
+ 
+
+
+
+Private Sub Listar_Emails_do_Outlook(objFolder As Folder)
+    
+    Dim xlApp As Object
+    Dim xlWB As Object
+    Dim xlSheet As Object
+    Dim rCount As Long
+    Dim bXStarted As Boolean
+    Dim myRecipients As Object
+    Dim objOL As Outlook.Application
+    Dim objItems As Outlook.Items
+    Dim obj As Object
+    Dim olItem As Outlook.MailItem
+            
+    Dim Endereco_do_Arquivo As String
+    Endereco_do_Arquivo = Nome_do_Arquivo_de_Exportacao()
+    
+    'Abre o Excel para exportar
+    On Error Resume Next
+    Set xlApp = GetObject(, "Excel.Application")
+    If Err <> 0 Then
+        Application.StatusBar = "O Excel está abrindo. Aguarde ... "
+        Set xlApp = CreateObject("Excel.Application")
+        bXStarted = True
+    End If
+    On Error GoTo 0
+    
+    On Error Resume Next
+
+    'Cria uma planilha nova para executar
+    Set xlWB = xlApp.Workbooks.Open(Endereco_do_Arquivo)
+    If Err <> 0 Then
+        Set xlWB = xlApp.Workbooks.Add
+        xlWB.SaveAs FileName:=Endereco_do_Arquivo
+    End If
+    On Error GoTo 0
+    Set xlSheet = xlWB.Sheets("Planilha1")
+        
+    On Error Resume Next
+    
+    'Conta quantos registros tem para fazer append
+    rCount = xlSheet.Range("B" & xlSheet.Rows.Count).End(-4162).Row
+    rCount = rCount + 1
+    
+    'Coloca os títulos
+    xlSheet.Range("A1") = "Nome do Contato"
+    xlSheet.Range("B1") = "E-mail"
+    xlSheet.Range("C1") = "Assunto do E-mail"
+    xlSheet.Range("D1") = "Data"
+    xlSheet.Range("E1") = "Pasta"
+    
+    
+    'Começa a coleta de dados do outlook
+    Set objOL = Outlook.Application
+    Set objItems = objFolder.Items
+    
+    For Each obj In objItems
+        
+        Set olItem = obj
+        
+        'Escreve o remetente
+        xlSheet.Range("A" & rCount) = olItem.SenderName
+        xlSheet.Range("B" & rCount) = Corrigir_Remetente(olItem.SenderEmailAddress)
+        
+        xlSheet.Range("C" & rCount) = olItem.Subject
+        xlSheet.Range("D" & rCount) = olItem.ReceivedTime
+        xlSheet.Range("E" & rCount) = objFolder.Parent.Name & "|" & objFolder.Name
+        
+        'Passa de linha
+        rCount = rCount + 1
+        
+        'Inicia o processamento do To
+        Set myRecipients = obj.Recipients
+        Dim myRecipient As Recipient
+        
+        If myRecipients.Count > 0 Then
+        
+            For Each myRecipient In myRecipients
+                xlSheet.Range("A" & rCount) = myRecipient.Name
+                xlSheet.Range("B" & rCount) = myRecipient.AddressEntry.GetExchangeUser().PrimarySmtpAddress
+                xlSheet.Range("C" & rCount) = olItem.Subject
+                rCount = rCount + 1
+            Next
+            
+        End If
+    
+    xlWB.Save
+    
+    Next
+ 
+    xlSheet.Rows.WrapText = False
+    
+    xlWB.Save
+    
+    xlWB.Close 1
+    
+    If bXStarted Then
+        xlApp.Quit
+    End If
+    
+    Set olItem = Nothing
+    Set obj = Nothing
+    Set xlApp = Nothing
+    Set xlWB = Nothing
+    Set xlSheet = Nothing
+    
+    
+     
+ End Sub
+
+
+Private Function Nome_do_Arquivo_de_Exportacao()
+
+    Dim endereco As String
+    Dim arquivo As String
+
+    endereco = CStr(Environ("USERPROFILE")) & "\Documents\"
+    arquivo = endereco & "exportacao_dos_emails_" & Replace(Replace(Str(Now()), ":", ""), "/", "") & ".xlsx"
+    
+    Nome_do_Arquivo_de_Exportacao = arquivo
+
+End Function
+
+
+
+Private Function Corrigir_Remetente(ByVal remetente As String)
+
+        Dim olEU As Outlook.ExchangeUser
+         Dim oEDL As Outlook.ExchangeDistributionList
+         Dim recip As Outlook.Recipient
+         Set recip = Application.Session.CreateRecipient(remetente)
+        
+         If InStr(1, remetente, "/") > 0 Then
+        ' if exchange, get smtp address
+             Select Case recip.AddressEntry.AddressEntryUserType
+               Case OlAddressEntryUserType.olExchangeUserAddressEntry
+                 Set olEU = recip.AddressEntry.GetExchangeUser
+                 If Not (olEU Is Nothing) Then
+                     remetente = olEU.PrimarySmtpAddress
+                 End If
+               Case OlAddressEntryUserType.olOutlookContactAddressEntry
+                 Set olEU = recip.AddressEntry.GetExchangeUser
+                 If Not (olEU Is Nothing) Then
+                    remetente = olEU.PrimarySmtpAddress
+                 End If
+               Case OlAddressEntryUserType.olExchangeDistributionListAddressEntry
+                 Set oEDL = recip.AddressEntry.GetExchangeDistributionList
+                 If Not (oEDL Is Nothing) Then
+                    remetente = olEU.PrimarySmtpAddress
+                 End If
+             End Select
+        End If
+        
+        Corrigir_Remetente = remetente
+
+End Function
