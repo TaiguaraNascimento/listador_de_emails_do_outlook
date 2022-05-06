@@ -6,3 +6,4 @@ de todas as pastas de uma caixa de e-mail. Exporta os dados em Excel.
 Útil para que trabalha com e-mail marketing, relacionamentos comerciais, entre outros.
 
 Desenvolvido por Taiguara Nascimento
+M: taiguara.nascimento@gmail.com
